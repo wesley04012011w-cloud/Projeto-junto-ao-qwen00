@@ -62,10 +62,16 @@ jobs:
         working-directory: ${{ steps.extract_zip.outputs.project_root }}
         run: |
           npm ci --legacy-peer-deps || npm install --legacy-peer-deps
-          
-          # Limpa cache do Metro para evitar resíduos
           rm -rf node_modules/.cache
           rm -rf .expo
+
+      - name: 🔑 Garantir debug.keystore
+        working-directory: ${{ steps.extract_zip.outputs.project_root }}/android/app
+        run: |
+          if [ ! -f "debug.keystore" ]; then
+            echo "Gerando debug.keystore..."
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
 
       - name: ⚙️ Configurar permissões do Gradle
         working-directory: ${{ steps.extract_zip.outputs.project_root }}
