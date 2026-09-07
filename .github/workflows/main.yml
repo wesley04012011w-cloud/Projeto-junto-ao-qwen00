@@ -11,7 +11,7 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name:  Clonar repositório
+      - name: 📥 Clonar repositório
         uses: actions/checkout@v4
 
       - name: 📦 Extrair arquivo ZIP do projeto
@@ -58,26 +58,14 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
 
-      - name:  Instalar dependências do projeto
+      - name: 📥 Instalar dependências do projeto
         working-directory: ${{ steps.extract_zip.outputs.project_root }}
         run: |
-          # Usa npm ci para instalação determinística (ignora yarn.lock)
           npm ci --legacy-peer-deps || npm install --legacy-peer-deps
           
-          # Limpa cache do Metro para evitar bundles corrompidos
+          # Limpa cache do Metro para evitar resíduos
           rm -rf node_modules/.cache
           rm -rf .expo
-
-      - name: ✅ Verificar versão do react-native-svg
-        working-directory: ${{ steps.extract_zip.outputs.project_root }}
-        run: |
-          SVG_VERSION=$(node -p "require('./node_modules/react-native-svg/package.json').version")
-          echo "Versão instalada do react-native-svg: $SVG_VERSION"
-          if [ "$SVG_VERSION" != "15.8.0" ]; then
-            echo "⚠️ AVISO: Versão esperada é 15.8.0, mas foi instalada $SVG_VERSION"
-            echo "Forçando reinstalação da versão correta..."
-            npm install react-native-svg@15.8.0 --legacy-peer-deps
-          fi
 
       - name: ⚙️ Configurar permissões do Gradle
         working-directory: ${{ steps.extract_zip.outputs.project_root }}
