@@ -11,13 +11,12 @@ jobs:
     timeout-minutes: 60
 
     steps:
-      - name: 📥 Clonar repositório
+      - name:  Clonar repositório
         uses: actions/checkout@v4
 
       - name: 📦 Extrair arquivo ZIP do projeto
         id: extract_zip
         run: |
-          # Procura qualquer arquivo .zip no repositório
           ZIP_FILE=$(find . -name "*.zip" | head -n 1)
           
           if [ -z "$ZIP_FILE" ]; then
@@ -29,7 +28,6 @@ jobs:
           mkdir -p /tmp/extracted_project
           unzip -q "$ZIP_FILE" -d /tmp/extracted_project
           
-          # Localiza onde o package.json foi extraído
           PKG_PATH=$(find /tmp/extracted_project -name "package.json" | head -n 1)
           if [ -z "$PKG_PATH" ]; then
             echo "❌ package.json não encontrado dentro do arquivo .zip!"
@@ -60,28 +58,40 @@ jobs:
           echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
           echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/26.1.10909125" >> $GITHUB_ENV
 
-      - name: 📦 Instalar dependências do projeto
+      - name:  Instalar dependências do projeto
         working-directory: ${{ steps.extract_zip.outputs.project_root }}
         run: |
-          if [ -f "yarn.lock" ]; then
-            npm install --global yarn
-            yarn install --network-timeout 1000000
-          elif [ -f "package-lock.json" ]; then
-            npm ci || npm install --legacy-peer-deps
-          else
-            npm install --legacy-peer-deps
+          # Usa npm ci para instalação determinística (ignora yarn.lock)
+          npm ci --legacy-peer-deps || npm install --legacy-peer-deps
+          
+          # Limpa cache do Metro para evitar bundles corrompidos
+          rm -rf node_modules/.cache
+          rm -rf .expo
+
+      - name: ✅ Verificar versão do react-native-svg
+        working-directory: ${{ steps.extract_zip.outputs.project_root }}
+        run: |
+          SVG_VERSION=$(node -p "require('./node_modules/react-native-svg/package.json').version")
+          echo "Versão instalada do react-native-svg: $SVG_VERSION"
+          if [ "$SVG_VERSION" != "15.8.0" ]; then
+            echo "⚠️ AVISO: Versão esperada é 15.8.0, mas foi instalada $SVG_VERSION"
+            echo "Forçando reinstalação da versão correta..."
+            npm install react-native-svg@15.8.0 --legacy-peer-deps
           fi
 
       - name: ⚙️ Configurar permissões do Gradle
         working-directory: ${{ steps.extract_zip.outputs.project_root }}
-        run: |
-          chmod +x android/gradlew
+        run: chmod +x android/gradlew
+
+      - name: 🧹 Limpar cache do Gradle
+        working-directory: ${{ steps.extract_zip.outputs.project_root }}/android
+        run: ./gradlew clean
 
       - name: 🚀 Compilar APK (Release)
         working-directory: ${{ steps.extract_zip.outputs.project_root }}/android
         run: |
           ./gradlew assembleRelease --no-daemon --stacktrace \
-            -Dorg.gradle.jvmargs="-Xmx4096m -XX:MaxMetaspaceSize=1024m"
+            -Dorg.gradle.jvmargs="-Xmx6144m -XX:MaxMetaspaceSize=1536m -XX:+HeapDumpOnOutOfMemoryError"
 
       - name: 🔍 Localizar APK gerado
         id: find_apk
